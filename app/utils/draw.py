@@ -1,6 +1,6 @@
 import cv2
 
-from utils.bbox_utils import is_valid_bbox
+from app.utils.bbox import is_valid_bbox
 
 
 def _display_label(label) -> str:

@@ -2,8 +2,8 @@ from pathlib import Path
 import torch
 
 
-CV_PIPELINE_ROOT = Path(__file__).resolve().parent
-REPO_ROOT = CV_PIPELINE_ROOT.parent
+APP_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = APP_ROOT.parent
 
 
 def _first_existing(paths):
@@ -13,14 +13,11 @@ def _first_existing(paths):
     return None
 
 
-# Prefer repo-level models/, then Cv_Pipeline/models/
 _MASK_WEIGHTS_CANDIDATES = [
     REPO_ROOT / "models" / "yolo" / "mask_yolov8_best.pt",
-    CV_PIPELINE_ROOT / "models" / "yolo" / "mask_yolov8_best.pt",
 ]
 _FALLBACK_WEIGHTS_CANDIDATES = [
     REPO_ROOT / "models" / "yolo" / "yolov8n.pt",
-    CV_PIPELINE_ROOT / "models" / "yolo" / "yolov8n.pt",
 ]
 
 _resolved_mask = _first_existing(_MASK_WEIGHTS_CANDIDATES)
@@ -30,8 +27,8 @@ YOLO_FALLBACK_MODEL_PATH = _resolved_fallback or _FALLBACK_WEIGHTS_CANDIDATES[0]
 
 BASE_DIR = REPO_ROOT
 MODEL_DIR = REPO_ROOT / "models"
-DATA_DIR = BASE_DIR / "data"
-LOG_DIR = CV_PIPELINE_ROOT / "logs"
+DATA_DIR = REPO_ROOT / "data"
+LOG_DIR = REPO_ROOT / "logs"
 
 
 VIDEO_SOURCE = 0

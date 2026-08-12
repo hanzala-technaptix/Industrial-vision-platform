@@ -1,7 +1,7 @@
 import time
 import math
 
-from utils.bbox_utils import is_valid_bbox
+from app.utils.bbox import is_valid_bbox
 
 
 class TrackedObject:
