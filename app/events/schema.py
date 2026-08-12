@@ -1,35 +1,27 @@
-"""Unified Event Schema for Backend and CV-Pipeline"""
-from pydantic import BaseModel
-from typing import Optional, List
+"""Unified event schema for the Factory AI POC."""
+from __future__ import annotations
+
+import time
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class EventSchema(BaseModel):
-    """Event schema for both CV-Pipeline and Backend API"""
-    event_id: Optional[str] = None
+    id: Optional[int] = None
     event_type: str
-    confidence: float
+    event_subtype: Optional[str] = None
+    detector: str
+    label: Optional[str] = None
+    confidence: float = 0.0
     camera_id: str
-    bbox: List[float]
-    timestamp: Optional[float] = None
+    track_id: Optional[int] = None
+    zone_id: Optional[str] = None
+    bbox: List[float] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: float = Field(default_factory=time.time)
 
-
-class Event:
-    """Event class for CV-Pipeline service"""
-    def __init__(self, event_type: str, confidence: float, camera_id: str, 
-                 bbox: List[float], timestamp: float, event_id: Optional[str] = None):
-        self.event_id = event_id
-        self.event_type = event_type
-        self.confidence = confidence
-        self.camera_id = camera_id
-        self.bbox = bbox
-        self.timestamp = timestamp
-
-    def to_dict(self):
-        return {
-            "event_id": self.event_id,
-            "event_type": self.event_type,
-            "confidence": self.confidence,
-            "camera_id": self.camera_id,
-            "bbox": self.bbox,
-            "timestamp": self.timestamp
-        }
+    def to_api(self) -> Dict[str, Any]:
+        d = self.model_dump()
+        d["timestamp_ms"] = int(self.timestamp * 1000)
+        return d
