@@ -1,0 +1,35 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Training / experiment outputs
+runs/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Local data / IDE
+.env
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Ultralytics auto-downloaded weights in cwd (canonical copy lives under models/yolo/)
+/yolov8n.pt
+
+# Large binary assets — kept locally, not in git
+data/
+models/
+test-videos/
+*.pt
+*.onnx
+*.tar.xz
+*.zip
+

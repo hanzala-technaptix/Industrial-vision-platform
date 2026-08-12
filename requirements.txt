@@ -1,0 +1,4 @@
+# Unified install for local development.
+# Source of truth: requirements/cv_service.txt + requirements/backend.txt
+-r requirements/cv_service.txt
+-r requirements/backend.txt
