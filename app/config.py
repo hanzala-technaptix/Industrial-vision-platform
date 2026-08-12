@@ -72,7 +72,21 @@ PPE_VIOLATION_MIN_FRAMES = _env_int("PPE_VIOLATION_MIN_FRAMES", 3)
 # Which PPE items to enforce (must match keys in PPE_TYPE_MAP)
 PPE_REQUIRED_ITEMS = os.getenv("PPE_REQUIRED_ITEMS", "hardhat,mask,vest,gloves").split(",")
 
-# Class name → normalized ppe_type; None means ignored for compliance logic
+# Phase 1 backend scope: keep model classes intact, but ignore everything outside
+# the active compliance set at inference/application level.
+ACTIVE_PPE_CLASSES = {
+    "Hardhat",
+    "NO-Hardhat",
+    "Mask",
+    "NO-Mask",
+    "Safety Vest",
+    "NO-Safety Vest",
+    "Gloves",
+    "NO-Gloves",
+}
+
+# Class name → normalized ppe_type; ignored classes are kept in the trained model but
+# deliberately excluded from the Phase 1 compliance pipeline.
 PPE_CLASS_MAP = {
     "Person": ("person", "person"),
     "Hardhat": ("hardhat", "positive"),
@@ -83,12 +97,6 @@ PPE_CLASS_MAP = {
     "NO-Safety Vest": ("vest", "negative"),
     "Gloves": ("gloves", "positive"),
     "NO-Gloves": ("gloves", "negative"),
-    # Ignored for Phase 1 but detector still returns them (frontend can hide)
-    "Goggles": ("goggles", "positive"),
-    "NO-Goggles": ("goggles", "negative"),
-    "Fall-Detected": ("fall", "event"),
-    "Ladder": ("ladder", "info"),
-    "Safety Cone": ("cone", "info"),
 }
 
 # -------- Tracking --------

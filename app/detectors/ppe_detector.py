@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from app.config import (
+    ACTIVE_PPE_CLASSES,
     DEVICE,
     PPE_ASSOC_MIN_OVERLAP,
     PPE_CLASS_MAP,
@@ -107,13 +108,25 @@ class PPEDetector(BaseDetector):
     # Association: person ↔ PPE
     # ------------------------------------------------------------------
     def _split_and_map(self, raw: List[Dict[str, Any]]):
-        """Split raw detections into person list and ppe list, with normalized types."""
+        """Split raw detections into person list and active PPE list, with normalized types.
+
+        The trained YOLO model may still emit Goggles / NO-Goggles / other non-Phase-1
+        classes, but the application intentionally ignores them for compliance.
+        """
         persons: List[Dict[str, Any]] = []
         ppe_items: List[Dict[str, Any]] = []
         misc: List[Dict[str, Any]] = []  # things we still want to render but don't feed into compliance
         for det in raw:
             label = det["label"]
-            mapping = PPE_CLASS_MAP.get(label)
+
+            # Keep Person as the tracked entity, but ignore any non-Phase-1 PPE class.
+            if label == "Person":
+                mapping = PPE_CLASS_MAP.get(label)
+            elif label in ACTIVE_PPE_CLASSES:
+                mapping = PPE_CLASS_MAP.get(label)
+            else:
+                mapping = None
+
             if mapping is None:
                 misc.append(det)
                 continue
@@ -285,3 +298,10 @@ class PPEDetector(BaseDetector):
             "tracked_persons": len(tracked),
             "persons": tracked,
         }
+
+
+from ultralytics import YOLO
+
+model = YOLO("models/yolo/ppe_yolov8_best.pt")
+
+print(model.names)
