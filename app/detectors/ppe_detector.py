@@ -11,6 +11,9 @@ from typing import Any, Dict, List, Optional
 from app.config import (
     ACTIVE_PPE_CLASSES,
     DEVICE,
+    PERSON_CONF_THRESHOLD,
+    PERSON_INFER_IMGSZ,
+    PERSON_MODEL_PATH,
     PPE_ASSOC_MIN_OVERLAP,
     PPE_CLASS_MAP,
     PPE_CONF_THRESHOLD,
@@ -39,7 +42,8 @@ class PPEDetector(BaseDetector):
 
     def __init__(self, camera_id: str = "cam"):
         super().__init__(camera_id)
-        self.model = None
+        self.ppe_model = None
+        self.person_model = None
         self.tracker = ObjectTracker(
             distance_threshold=TRACK_DISTANCE_THRESHOLD,
             stale_timeout=TRACK_STALE_TIMEOUT,
@@ -48,45 +52,56 @@ class PPEDetector(BaseDetector):
         # Per-track compliance history: {track_id: {ppe_type: state}}
         self._per_track_state: Dict[int, Dict[str, str]] = {}
 
+    # Backwards-compat alias used by the older tests (they assigned `.model`
+    # directly to bypass YOLO for synthetic scenes).
+    @property
+    def model(self):
+        return self.ppe_model
+
+    @model.setter
+    def model(self, v):
+        self.ppe_model = v
+
     def setup(self) -> None:
         from ultralytics import YOLO
-        path = PPE_MODEL_PATH if PPE_MODEL_PATH.exists() else PPE_FALLBACK_PATH
-        if not path.exists():
-            print(f"[ppe] no local weights; downloading yolov8n")
-            self.model = YOLO("yolov8n.pt")
+
+        # PPE model — for equipment classes only
+        ppe_path = PPE_MODEL_PATH if PPE_MODEL_PATH.exists() else PPE_FALLBACK_PATH
+        if not ppe_path.exists():
+            print("[ppe] no local PPE weights; downloading yolov8n as fallback")
+            self.ppe_model = YOLO("yolov8n.pt")
         else:
-            print(f"[ppe] loading {path}")
-            self.model = YOLO(str(path))
-        try:
-            self.model.to(DEVICE)
-        except Exception:
-            pass
-        # Warm-up inference gets the first-call compile cost out of the way
+            print(f"[ppe] loading PPE model {ppe_path}")
+            self.ppe_model = YOLO(str(ppe_path))
+
+        # Person model — COCO-trained yolov8n, reliable Person class
+        person_path = PERSON_MODEL_PATH
+        if not person_path.exists():
+            print("[ppe] no local person weights; downloading yolov8n")
+            self.person_model = YOLO("yolov8n.pt")
+        else:
+            print(f"[ppe] loading Person model {person_path}")
+            self.person_model = YOLO(str(person_path))
+
+        for m in (self.ppe_model, self.person_model):
+            try:
+                m.to(DEVICE)
+            except Exception:
+                pass
+
+        # Warm-up
         try:
             import numpy as np
             _dummy = np.zeros((320, 320, 3), dtype="uint8")
-            self.model(_dummy, verbose=False)
+            self.ppe_model(_dummy, verbose=False)
+            self.person_model(_dummy, verbose=False, classes=[0])
         except Exception:
             pass
 
     # ------------------------------------------------------------------
     # Inference
     # ------------------------------------------------------------------
-    def _infer(self, frame) -> List[Dict[str, Any]]:
-        if self.model is None:
-            return []
-        try:
-            results = self.model(
-                frame,
-                conf=PPE_CONF_THRESHOLD,
-                iou=PPE_IOU_THRESHOLD,
-                imgsz=PPE_INFER_IMGSZ,
-                verbose=False,
-            )
-        except Exception as e:
-            print(f"[ppe] inference error: {e}")
-            return []
-
+    def _boxes_to_dicts(self, results, model, allowed_labels=None) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
         for r in results:
             if r.boxes is None or len(r.boxes) == 0:
@@ -94,15 +109,59 @@ class PPEDetector(BaseDetector):
             for box in r.boxes:
                 try:
                     cls_id = int(box.cls[0].item())
-                    label = self.model.names.get(cls_id) if isinstance(self.model.names, dict) else self.model.names[cls_id]
+                    names = model.names
+                    label = names.get(cls_id) if isinstance(names, dict) else names[cls_id]
                     conf = float(box.conf[0].item())
                     xyxy = [float(v) for v in box.xyxy[0].tolist()]
                 except Exception:
                     continue
                 if not is_valid_bbox(xyxy):
                     continue
+                if allowed_labels is not None and label not in allowed_labels:
+                    continue
                 out.append({"label": str(label), "confidence": conf, "bbox": xyxy})
         return out
+
+    def _infer(self, frame) -> List[Dict[str, Any]]:
+        if self.ppe_model is None:
+            return []
+        combined: List[Dict[str, Any]] = []
+
+        # 1. Person detections from COCO model — class 0 is Person; rename so
+        #    downstream mapping treats it identically to the PPE model's Person.
+        if self.person_model is not None:
+            try:
+                pr = self.person_model(
+                    frame,
+                    conf=PERSON_CONF_THRESHOLD,
+                    imgsz=PERSON_INFER_IMGSZ,
+                    verbose=False,
+                    classes=[0],
+                )
+                persons = self._boxes_to_dicts(pr, self.person_model)
+                for p in persons:
+                    p["label"] = "Person"   # normalize "person" (COCO) → "Person"
+                combined.extend(persons)
+            except Exception as e:
+                print(f"[ppe] person inference error: {e}")
+
+        # 2. PPE equipment detections — drop the PPE model's Person class
+        #    (unreliable) so only equipment classes flow through.
+        try:
+            pr = self.ppe_model(
+                frame,
+                conf=PPE_CONF_THRESHOLD,
+                iou=PPE_IOU_THRESHOLD,
+                imgsz=PPE_INFER_IMGSZ,
+                verbose=False,
+            )
+            items = self._boxes_to_dicts(pr, self.ppe_model)
+            items = [i for i in items if i["label"] != "Person"]
+            combined.extend(items)
+        except Exception as e:
+            print(f"[ppe] ppe inference error: {e}")
+
+        return combined
 
     # ------------------------------------------------------------------
     # Association: person ↔ PPE

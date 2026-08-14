@@ -63,6 +63,12 @@ PPE_FALLBACK_PATH = MODEL_DIR / "yolo" / "yolov8n.pt"
 PPE_CONF_THRESHOLD = _env_float("PPE_CONF_THRESHOLD", 0.35)
 PPE_IOU_THRESHOLD = _env_float("PPE_IOU_THRESHOLD", 0.45)
 PPE_INFER_IMGSZ = _env_int("PPE_INFER_IMGSZ", 640)
+
+# The PPE model's Person class is unreliable on real footage; we detect persons
+# with COCO yolov8n.pt instead and reserve the PPE model for equipment only.
+PERSON_MODEL_PATH = MODEL_DIR / "yolo" / "yolov8n.pt"
+PERSON_CONF_THRESHOLD = _env_float("PERSON_CONF_THRESHOLD", 0.35)
+PERSON_INFER_IMGSZ = _env_int("PERSON_INFER_IMGSZ", 640)
 # Fraction of PPE bbox area that must overlap the person bbox to associate
 PPE_ASSOC_MIN_OVERLAP = _env_float("PPE_ASSOC_MIN_OVERLAP", 0.30)
 # Seconds between duplicate violations for the same (track, ppe_type)
