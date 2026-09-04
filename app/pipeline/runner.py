@@ -1,4 +1,4 @@
-"""FramePipeline — single per-camera background loop."""
+"""Live camera pipeline — background thread."""
 from __future__ import annotations
 
 import threading
@@ -7,11 +7,12 @@ from typing import Dict, List, Optional
 
 import cv2
 
+from app.alerts.manager import AlertManager
 from app.camera.manager import CameraManager
-from app.config import FRAME_HEIGHT, FRAME_SKIP, FRAME_WIDTH
+from app.core.config import FRAME_HEIGHT, FRAME_SKIP, FRAME_WIDTH
+from app.detectors.base import BaseDetector
 from app.events.engine import EventEngine
-from app.pipeline.base_detector import BaseDetector, DetectionResult
-from app.utils.draw import draw_detections
+from app.pipeline.frame_processor import FrameProcessor
 
 
 class FramePipeline:
@@ -21,30 +22,37 @@ class FramePipeline:
         event_engine: EventEngine,
         detectors: List[BaseDetector],
         camera_id: str,
+        alert_manager: Optional[AlertManager] = None,
     ):
         self.camera_manager = camera_manager
-        self.event_engine = event_engine
-        self.detectors = detectors
         self.camera_id = camera_id
+        self.processor = FrameProcessor(
+            detectors=detectors,
+            event_engine=event_engine,
+            alert_manager=alert_manager,
+            camera_id=camera_id,
+        )
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._frame_count = 0
         self._latest_annotated = None
+        self._latest_alerts: List[str] = []
         self._lock = threading.Lock()
         self._last_process_time = 0.0
 
     def start(self) -> None:
         if self._running:
             return
-        for d in self.detectors:
-            try:
-                d.setup()
+        try:
+            self.processor.setup()
+            for d in self.processor.detectors:
                 print(f"[pipeline] detector {d.name} ready")
-            except Exception as e:
-                print(f"[pipeline] detector {d.name} setup FAILED: {e}")
-                d.enabled = False
+        except Exception as e:
+            print(f"[pipeline] setup error: {e}")
         self._running = True
-        self._thread = threading.Thread(target=self._run, daemon=True, name=f"pipe-{self.camera_id}")
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name=f"pipe-{self.camera_id}"
+        )
         self._thread.start()
 
     def _run(self) -> None:
@@ -56,7 +64,6 @@ class FramePipeline:
 
             self._frame_count += 1
             if FRAME_SKIP > 1 and (self._frame_count % FRAME_SKIP) != 0:
-                # still refresh latest_annotated with the raw frame so /video_feed stays live
                 with self._lock:
                     if self._latest_annotated is None:
                         try:
@@ -70,36 +77,18 @@ class FramePipeline:
             except Exception:
                 pass
 
-            all_results: List[DetectionResult] = []
-            for d in self.detectors:
-                if not d.enabled:
-                    continue
-                if d.frame_stride > 1 and (self._frame_count % d.frame_stride) != 0:
-                    continue
-                try:
-                    r = d.process(frame, self._frame_count)
-                except Exception as e:
-                    print(f"[pipeline] {d.name} process error: {e}")
-                    continue
-                for row in r:
-                    row.setdefault("detector", d.name)
-                all_results.extend(r)
-
             try:
-                self.event_engine.process(all_results, camera_id=self.camera_id)
+                result = self.processor.process(frame, self._frame_count)
             except Exception as e:
-                print(f"[pipeline] event engine error: {e}")
+                print(f"[pipeline] process error: {e}")
+                continue
 
-            annotated = draw_detections(frame.copy(), all_results)
             with self._lock:
-                self._latest_annotated = annotated
+                self._latest_annotated = result.annotated
+                self._latest_alerts = result.alerts
                 self._last_process_time = time.time()
 
-        for d in self.detectors:
-            try:
-                d.cleanup()
-            except Exception:
-                pass
+        self.processor.cleanup()
 
     def get_latest_frame(self):
         with self._lock:
@@ -107,8 +96,12 @@ class FramePipeline:
                 return None
             return self._latest_annotated.copy()
 
+    def get_latest_alerts(self) -> List[str]:
+        with self._lock:
+            return list(self._latest_alerts)
+
     def get_detector_states(self) -> List[Dict]:
-        return [d.get_state() for d in self.detectors]
+        return [d.get_state() for d in self.processor.detectors]
 
     def stats(self) -> Dict:
         return {
@@ -116,7 +109,7 @@ class FramePipeline:
             "running": self._running,
             "frames_seen": self._frame_count,
             "last_process_age_s": (time.time() - self._last_process_time) if self._last_process_time else None,
-            "detectors": [d.name for d in self.detectors if d.enabled],
+            "detectors": [d.name for d in self.processor.detectors if d.enabled],
         }
 
     def stop(self) -> None:

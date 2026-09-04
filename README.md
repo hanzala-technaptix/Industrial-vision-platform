@@ -1,68 +1,58 @@
 # Industrial Vision AI
 
-Merged industrial computer-vision project (base: `industrial-vision-ai` + idle demos from `industrial-vision-idle`).
-
-Capabilities in this repo:
-
-- **PPE / mask detection** — live worker with tracking and events
-- **FastAPI backend** + **React dashboard**
-- **Machine idle** — optical flow demo (`scripts/demos/detect_machine_idle.py`)
-- **Worker idle** — YOLO person + motion demo (`scripts/demos/detect_worker_idle.py`)
-- **Zone presence** — polygon + person demo (`scripts/demos/detect_zone_presence.py`)
-
-Food-industry PPE class labels from the legacy CV_bot project are kept at `data/ppe_food/classes.txt` (reference only; the old Flask/YOLOv5 app was not merged).
+Factory computer-vision POC — **CEO demos first**, unified modular `app/` core.
 
 ## Setup
 
-1. Create and activate a Python virtual environment.
-2. Install dependencies from the repo root:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. For the frontend:
-   ```bash
-   cd frontend && npm install
-   ```
-
-## Run — PPE detection (primary)
-
-From `Cv_Pipeline/`:
-
-```bash
-cd Cv_Pipeline
-python main.py
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-Events are written to `storage_data/events.json`.
+Place YOLO weights under `models/yolo/`. Test videos under `test-videos/`.
 
-## Run — Backend API + dashboard
+## Run CEO demos
 
-```bash
-# Terminal 1 — API (port 8001)
-cd backend
-uvicorn main:app --reload --port 8001
-
-# Terminal 2 — React UI
-cd frontend
-npm run dev
+```powershell
+python demos/01_ppe/run.py --show
+python demos/02_person_vehicle/run.py
+python demos/03_restricted_zone/run.py
+python demos/06_machine_idle/run.py
+python demos/07_worker_idle/run.py
 ```
 
-## Run — Idle & presence demos
+See [`demos/README.md`](demos/README.md) for the full list.
 
-From the repo root (see `scripts/demos/README.md`):
+## Architecture
 
-```bash
-python scripts/demos/detect_machine_idle.py --source 0
-python scripts/demos/detect_worker_idle.py --source 0 --model models/yolo/yolov8n.pt
-python scripts/demos/detect_zone_presence.py --source 0 --model models/yolo/yolov8n.pt
+```text
+app/
+├── core/           config, logging, bbox, dependencies
+├── camera/         stream, manager, source
+├── detectors/      base, ppe, person, zone, machine_idle
+├── events/         models, engine, repository
+├── alerts/         ppe alerts, manager
+├── pipeline/       frame_processor, runner, result
+├── rendering/      detections, overlays, renderer
+└── api/            routes, video, events
+
+demos/
+├── 01_ppe/run.py   thin CLI → demos/lib/video_runner.py → app/
+└── lib/            cli.py, video_runner.py (shared demo runner)
 ```
 
-Press `q` or ESC to quit each demo.
+Demos and the API server share **`FrameProcessor`** — same detectors, events, and alerts.
 
-## Docs
+## API (optional)
 
-- `docs/OmniVision_Architecture.md` — product/architecture notes from the idle project
+```powershell
+$env:VIDEO_SOURCE = "test-videos/ppe_construction_site.mp4"
+python run.py
+```
 
-## Phase 1 merge note
+Endpoints: `/health`, `/events`, `/video_feed`
 
-This merge intentionally does **not** unify camera loops, event schemas, or backend inference yet. Those are stabilization tasks after all four flows are verified working in one folder.
+## Training
+
+Offline scripts: `tools/training/`

@@ -17,9 +17,14 @@ frontend/dist/
 # Local data / IDE
 .env
 *.log
+logs/
+*_report.json
 .DS_Store
 .vscode/
 .idea/
+
+# Quality demo samples (add locally when ready)
+test-images/
 
 # Ultralytics auto-downloaded weights in cwd (canonical copy lives under models/yolo/)
 /yolov8n.pt

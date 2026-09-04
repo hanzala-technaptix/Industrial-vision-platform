@@ -1,4 +1,4 @@
-"""MJPEG live stream of the pipeline's latest annotated frame."""
+"""MJPEG live stream."""
 from __future__ import annotations
 
 import time
@@ -7,10 +7,10 @@ import cv2
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from app.config import JPEG_QUALITY
+from app.core.config import JPEG_QUALITY
+from app.core.dependencies import get_pipeline
 
 router = APIRouter()
-
 _BOUNDARY = "frame"
 
 
@@ -36,7 +36,7 @@ def _mjpeg_generator(pipeline):
 
 @router.get("/video_feed")
 def video_feed(request: Request):
-    pipe = getattr(request.app.state, "pipeline", None)
+    pipe = get_pipeline(request)
     return StreamingResponse(
         _mjpeg_generator(pipe),
         media_type=f"multipart/x-mixed-replace; boundary={_BOUNDARY}",
