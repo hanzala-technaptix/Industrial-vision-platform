@@ -45,3 +45,29 @@ def containment(inner: Sequence[float], outer: Sequence[float]) -> float:
     inter = bbox_intersection(inner, outer)
     a = bbox_area(inner)
     return inter / a if a > 0 else 0.0
+
+
+def nms_detections(
+    dets: list,
+    *,
+    iou_thresh: float = 0.45,
+    contain_thresh: float = 0.65,
+) -> list:
+    """Keep the largest confident box when several cover the same object."""
+    ranked = sorted(
+        [d for d in dets if is_valid_bbox(d.get("bbox"))],
+        key=lambda d: (bbox_area(d["bbox"]), float(d.get("confidence") or 0.0)),
+        reverse=True,
+    )
+    keep: list = []
+    for det in ranked:
+        bb = det["bbox"]
+        overlapped = False
+        for kept in keep:
+            kb = kept["bbox"]
+            if bbox_iou(bb, kb) >= iou_thresh or containment(bb, kb) >= contain_thresh:
+                overlapped = True
+                break
+        if not overlapped:
+            keep.append(det)
+    return keep

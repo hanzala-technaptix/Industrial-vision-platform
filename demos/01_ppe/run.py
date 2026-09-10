@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from app.use_cases.ppe_compliance import run
+from app.pipelines.ppe import run
 
 if __name__ == "__main__":
     raise SystemExit(run())

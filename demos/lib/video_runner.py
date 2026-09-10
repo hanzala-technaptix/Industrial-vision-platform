@@ -21,6 +21,7 @@ class VideoRunConfig:
     video_path: Path
     camera_id: str = "demo"
     stride: int = 2
+    frame_delay_ms: int = 1
     max_frames: int = 0
     show: bool = False
     out_path: Optional[Path] = None
@@ -102,7 +103,7 @@ def run_video(processor: FrameProcessor, cfg: VideoRunConfig) -> VideoRunStats:
             if show_frame(cfg.window_title, result.annotated, enabled=cfg.show):
                 if cfg.alert_window:
                     show_alert_window(cfg.alert_window, result.alerts, enabled=cfg.show)
-                if wait_key(1) in (ord("q"), 27):
+                if wait_key(cfg.frame_delay_ms) in (ord("q"), 27):
                     break
 
         if cfg.max_frames and stats.processed >= cfg.max_frames:

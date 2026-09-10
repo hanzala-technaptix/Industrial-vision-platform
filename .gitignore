@@ -1,40 +1,74 @@
-# Python
+# --- Python ---
 venv/
 .venv/
+env/
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.ipynb_checkpoints/
 
-# Training / experiment outputs
-runs/
-
-# Node
-frontend/node_modules/
-frontend/dist/
-
-# Local data / IDE
+# --- Secrets / credentials ---
 .env
-*.log
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.secret
+credentials.json
+secrets.json
+*.credentials
+
+# --- Local data / runtime ---
 logs/
-*_report.json
-.DS_Store
-.vscode/
-.idea/
-
-# Quality demo samples (add locally when ready)
-test-images/
-
-# Ultralytics auto-downloaded weights in cwd (canonical copy lives under models/yolo/)
-/yolov8n.pt
-
-# Large binary assets — kept locally, not in git
+# Training + R&D datasets (~6 GB). Keep on disk. Never commit.
 data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*_report.json
+
+# --- Models & media (local only) ---
 models/
-test-videos/
 *.pt
 *.onnx
-*.tar.xz
+*.pth
+*.weights
+*.mp4
+*.avi
+*.mkv
 *.zip
+*.tar
+*.tar.gz
+*.tar.xz
+/person.pt
+/ppe.pt
+/mask.pt
+/yolov8n.pt
+runs/
 
+# --- Node / frontend ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/

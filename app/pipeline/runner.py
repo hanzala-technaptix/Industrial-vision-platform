@@ -3,16 +3,31 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import cv2
 
-from app.alerts.manager import AlertManager
+from app.events.alerts import AlertManager
 from app.camera.manager import CameraManager
-from app.core.config import FRAME_HEIGHT, FRAME_SKIP, FRAME_WIDTH
-from app.detectors.base import BaseDetector
+from app.core.config import FRAME_HEIGHT, FRAME_WIDTH
+from app.detection.base import BaseDetector
 from app.events.engine import EventEngine
 from app.pipeline.frame_processor import FrameProcessor
+
+
+def _fit_frame(frame, max_w: int, max_h: int):
+    """Downscale keeping aspect ratio. Do not squash 16:9 into a short box."""
+    h, w = frame.shape[:2]
+    if w <= 0 or h <= 0:
+        return frame
+    scale = min(max_w / w, max_h / h, 1.0)
+    if scale >= 0.999:
+        return frame
+    nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+    # Portrait clips like 478x850 would become ~304x540 and starve YOLO.
+    if min(nw, nh) < 480 and min(w, h) >= 400:
+        return frame
+    return cv2.resize(frame, (nw, nh))
 
 
 class FramePipeline:
@@ -23,6 +38,7 @@ class FramePipeline:
         detectors: List[BaseDetector],
         camera_id: str,
         alert_manager: Optional[AlertManager] = None,
+        post_draw: Optional[Callable] = None,
     ):
         self.camera_manager = camera_manager
         self.camera_id = camera_id
@@ -31,6 +47,7 @@ class FramePipeline:
             event_engine=event_engine,
             alert_manager=alert_manager,
             camera_id=camera_id,
+            post_draw=post_draw,
         )
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -56,24 +73,21 @@ class FramePipeline:
         self._thread.start()
 
     def _run(self) -> None:
+        last_seq = -1
         while self._running:
-            frame = self.camera_manager.get_frame(self.camera_id)
-            if frame is None:
-                time.sleep(0.03)
+            snap = getattr(self.camera_manager, "get_snapshot", None)
+            if snap is not None:
+                frame, seq = snap(self.camera_id)
+            else:
+                frame, seq = self.camera_manager.get_frame(self.camera_id), last_seq + 1
+            if frame is None or seq == last_seq:
+                time.sleep(0.01)
                 continue
-
+            last_seq = seq
             self._frame_count += 1
-            if FRAME_SKIP > 1 and (self._frame_count % FRAME_SKIP) != 0:
-                with self._lock:
-                    if self._latest_annotated is None:
-                        try:
-                            self._latest_annotated = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
-                        except Exception:
-                            self._latest_annotated = frame
-                continue
 
             try:
-                frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
+                frame = _fit_frame(frame, FRAME_WIDTH, FRAME_HEIGHT)
             except Exception:
                 pass
 

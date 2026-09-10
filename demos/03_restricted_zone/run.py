@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from app.use_cases.restricted_zone import run
+from app.pipelines.restricted_zone import run
 
 if __name__ == "__main__":
     raise SystemExit(run())

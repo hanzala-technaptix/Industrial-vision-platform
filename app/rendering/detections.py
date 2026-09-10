@@ -7,6 +7,7 @@ from app.core.bbox import is_valid_bbox
 
 _PALETTE = {
     "Person": (255, 200, 0),
+    "person": (255, 200, 0),
     "Hardhat": (0, 220, 0),
     "NO-Hardhat": (0, 0, 240),
     "Mask": (0, 200, 120),

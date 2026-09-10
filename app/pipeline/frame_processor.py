@@ -3,11 +3,36 @@ from __future__ import annotations
 
 from typing import Callable, List, Optional
 
-from app.alerts.manager import AlertManager
-from app.detectors.base import BaseDetector
+from app.events.alerts import AlertManager
+from app.detection.base import BaseDetector
 from app.events.engine import EventEngine
 from app.pipeline.result import FrameResult
+from app.rendering.overlays import render_alert_panel
 from app.rendering.renderer import render_frame
+
+
+def _draw_alert_banner(frame, alerts: List[str]):
+    if frame is None or not alerts:
+        return frame
+    try:
+        import cv2
+    except Exception:
+        return frame
+    panel = render_alert_panel(alerts, width=min(520, max(200, frame.shape[1] - 20)))
+    if panel is None:
+        return frame
+    ph, pw = panel.shape[:2]
+    h, w = frame.shape[:2]
+    if ph > h - 10 or pw > w - 10:
+        scale = min((w - 20) / pw, (h - 20) / ph, 1.0)
+        panel = cv2.resize(panel, (max(1, int(pw * scale)), max(1, int(ph * scale))))
+        ph, pw = panel.shape[:2]
+    y, x = 10, 10
+    roi = frame[y : y + ph, x : x + pw]
+    if roi.shape[:2] != panel.shape[:2]:
+        return frame
+    cv2.addWeighted(panel, 0.88, roi, 0.12, 0, roi)
+    return frame
 
 
 class FrameProcessor:
@@ -50,6 +75,7 @@ class FrameProcessor:
             alerts = self.alert_manager.update(all_results)
 
         annotated = render_frame(frame, all_results, post_draw=self.post_draw)
+        annotated = _draw_alert_banner(annotated, alerts)
         return FrameResult(
             detections=all_results,
             annotated=annotated,

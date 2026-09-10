@@ -1,4 +1,18 @@
-# Unified install for local development.
-# Source of truth: requirements/cv_service.txt + requirements/backend.txt
--r requirements/cv_service.txt
--r requirements/backend.txt
+# Industrial Vision AI — single install for demos + API
+#
+# Do NOT install opencv-python-headless — it breaks cv2.imshow for CEO demos.
+
+# Computer vision
+opencv-python==4.10.0.84
+ultralytics==8.3.0
+numpy==1.26.4
+torch==2.5.1
+torchvision==0.20.1
+requests==2.32.3
+scipy==1.14.1
+
+# API / config
+fastapi==0.115.0
+uvicorn==0.32.0
+pydantic==2.9.2
+python-dotenv==1.0.1

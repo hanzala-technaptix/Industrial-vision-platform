@@ -1,8 +1,0 @@
-opencv-python==4.10.0.84
-# Do NOT install opencv-python-headless — it breaks cv2.imshow for CEO demos.
-ultralytics==8.3.0
-numpy==1.26.4
-torch==2.5.1
-torchvision==0.20.1
-requests==2.32.3
-scipy==1.14.1

@@ -52,26 +52,27 @@ DEVICE = os.getenv("DEVICE", "cuda" if _HAS_CUDA else "cpu")
 _video_env = os.getenv("VIDEO_SOURCE", "0")
 VIDEO_SOURCE = int(_video_env) if _video_env.isdigit() else _video_env
 CAMERA_ID = os.getenv("CAMERA_ID", "CAM_01")
+USE_CASE = os.getenv("USE_CASE", "ppe").strip().lower()
 
 # Pipeline
-FRAME_WIDTH = _env_int("FRAME_WIDTH", 640)
-FRAME_HEIGHT = _env_int("FRAME_HEIGHT", 360)
+FRAME_WIDTH = _env_int("FRAME_WIDTH", 960)
+FRAME_HEIGHT = _env_int("FRAME_HEIGHT", 540)
 FRAME_SKIP = _env_int("FRAME_SKIP", 2)
 JPEG_QUALITY = _env_int("JPEG_QUALITY", 80)
 
 # PPE
-PPE_MODEL_PATH = MODEL_DIR / "yolo" / "ppe_yolov8_best.pt"
-PPE_FALLBACK_PATH = MODEL_DIR / "yolo" / "yolov8n.pt"
+PPE_MODEL_PATH = MODEL_DIR / "ppe.pt"
+PPE_FALLBACK_PATH = MODEL_DIR / "person.pt"
 PPE_CONF_THRESHOLD = _env_float("PPE_CONF_THRESHOLD", 0.18)
 PPE_IOU_THRESHOLD = _env_float("PPE_IOU_THRESHOLD", 0.45)
 PPE_INFER_IMGSZ = _env_int("PPE_INFER_IMGSZ", 640)
-PERSON_MODEL_PATH = MODEL_DIR / "yolo" / "yolov8n.pt"
-PERSON_CONF_THRESHOLD = _env_float("PERSON_CONF_THRESHOLD", 0.35)
+PERSON_MODEL_PATH = MODEL_DIR / "person.pt"
+PERSON_CONF_THRESHOLD = _env_float("PERSON_CONF_THRESHOLD", 0.15)
 PERSON_INFER_IMGSZ = _env_int("PERSON_INFER_IMGSZ", 640)
 PPE_ASSOC_MIN_OVERLAP = _env_float("PPE_ASSOC_MIN_OVERLAP", 0.30)
 MASK_ASSOC_MIN_OVERLAP = _env_float("MASK_ASSOC_MIN_OVERLAP", 0.15)
 PPE_POSITIVE_MIN_CONF = _env_float("PPE_POSITIVE_MIN_CONF", 0.25)
-MASK_MODEL_PATH = MODEL_DIR / "yolo" / "mask_yolov8_best.pt"
+MASK_MODEL_PATH = MODEL_DIR / "mask.pt"
 MASK_CONF_THRESHOLD = _env_float("MASK_CONF_THRESHOLD", 0.15)
 MASK_INFER_IMGSZ = _env_int("MASK_INFER_IMGSZ", 640)
 PPE_VIOLATION_COOLDOWN = _env_float("PPE_VIOLATION_COOLDOWN", 10.0)
@@ -98,6 +99,12 @@ PPE_CLASS_MAP = {
 # Tracking
 TRACK_DISTANCE_THRESHOLD = _env_float("TRACK_DISTANCE_THRESHOLD", 100.0)
 TRACK_STALE_TIMEOUT = _env_float("TRACK_STALE_TIMEOUT", 3.0)
+
+# Quality (MVTec still-image classifier — not CCTV)
+QUALITY_MODEL_PATH = MODEL_DIR / "quality.pt"
+QUALITY_CATEGORY = os.getenv("QUALITY_CATEGORY", "hazelnut")
+MVTEC_ROOT = DATA_DIR / "quality" / "mvtec"
+TEST_IMAGE_DIR = REPO_ROOT / "test-images" / "quality"
 
 # Database
 DB_PATH = Path(os.getenv("DB_PATH", str(DATA_DIR / "factory.db")))

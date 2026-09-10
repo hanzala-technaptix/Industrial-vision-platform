@@ -8,14 +8,14 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.config import JPEG_QUALITY
-from app.core.dependencies import get_pipeline
 
 router = APIRouter()
 _BOUNDARY = "frame"
 
 
-def _mjpeg_generator(pipeline):
+def _mjpeg_generator(holder):
     while True:
+        pipeline = holder() if callable(holder) else holder
         frame = pipeline.get_latest_frame() if pipeline is not None else None
         if frame is None:
             time.sleep(0.05)
@@ -36,8 +36,15 @@ def _mjpeg_generator(pipeline):
 
 @router.get("/video_feed")
 def video_feed(request: Request):
-    pipe = get_pipeline(request)
+    app = request.app
+
+    def current():
+        session = getattr(app.state, "session", None)
+        if session is not None:
+            return session.get_pipeline()
+        return getattr(app.state, "pipeline", None)
+
     return StreamingResponse(
-        _mjpeg_generator(pipe),
+        _mjpeg_generator(current),
         media_type=f"multipart/x-mixed-replace; boundary={_BOUNDARY}",
     )

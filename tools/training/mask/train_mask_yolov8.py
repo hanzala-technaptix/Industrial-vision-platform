@@ -334,7 +334,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-per-class-metrics", action="store_true", help="Run validation for per-class AP.")
     parser.add_argument(
         "--deployed-model-path",
-        default="models/yolo/mask_yolov8_best.pt",
+        default="models/mask_yolov8_best.pt",
         help="Stable path where current run best.pt is copied for inference.",
     )
     return parser.parse_args()
