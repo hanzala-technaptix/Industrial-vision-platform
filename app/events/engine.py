@@ -1,36 +1,23 @@
-"""EventEngine — turns DetectionResults into deduplicated persistent events.
-
-Phase 1 rules:
-  * ppe_violation events fire when a tracked person's PPE state for a required
-    item is `violating` for N consecutive frames, with a per-(track, ppe_type)
-    cooldown to prevent event spam.
-  * ppe_compliant events fire on the flip from violating → compliant.
-"""
+"""EventEngine — deduplicated persistent events from detector output."""
 from __future__ import annotations
 
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
-from app.config import (
-    PPE_VIOLATION_COOLDOWN,
-    PPE_VIOLATION_MIN_FRAMES,
-)
-from app.db.database import insert_event
-from app.events.schema import EventSchema
+from app.core.config import PPE_VIOLATION_COOLDOWN, PPE_VIOLATION_MIN_FRAMES
+from app.events.models import EventSchema
+from app.events.repository import insert_event
 
 
 class EventEngine:
     def __init__(self):
-        # (track_id, ppe_type) -> {"streak": int, "last_state": str, "last_event_ts": float, "was_violating": bool}
         self._per_pair: Dict[Tuple[int, str], Dict[str, Any]] = defaultdict(
             lambda: {"streak": 0, "last_state": "unknown", "last_event_ts": 0.0, "was_violating": False}
         )
-        # In-memory recent buffer for cheap /events endpoints
         self._recent: List[Dict[str, Any]] = []
         self._recent_max = 200
 
-    # ------------------------------------------------------------------
     def _persist(self, ev: EventSchema) -> None:
         try:
             new_id = insert_event(ev.model_dump())
@@ -65,18 +52,13 @@ class EventEngine:
         )
         self._persist(ev)
 
-    # ------------------------------------------------------------------
     def process(self, detections: List[Dict[str, Any]], camera_id: str) -> None:
-        """Consume all detector output for this frame and emit events per rules."""
         now = time.time()
-
-        # Pick up person rows (they carry the compliance summary)
         persons = [
             d for d in detections
             if d.get("detector") == "ppe"
             and (d.get("metadata") or {}).get("role") == "person"
         ]
-
         seen_pairs: set = set()
 
         for person in persons:
@@ -86,7 +68,6 @@ class EventEngine:
             meta = person.get("metadata") or {}
             bbox = person.get("bbox") or []
             conf = float(person.get("confidence") or 0.0)
-
             violating: List[str] = list(meta.get("violating") or [])
             compliant: List[str] = list(meta.get("compliant") or [])
 
@@ -100,8 +81,6 @@ class EventEngine:
                     st["streak"] = 1
                 st["last_state"] = "violating"
 
-                # Emit if either (a) fresh transition into violating with enough streak
-                # or (b) cooldown has elapsed since last event of this pair
                 fresh = not st["was_violating"] and st["streak"] >= PPE_VIOLATION_MIN_FRAMES
                 cooled_down = (now - st["last_event_ts"]) >= PPE_VIOLATION_COOLDOWN
                 if fresh or (st["was_violating"] and cooled_down):
@@ -133,7 +112,6 @@ class EventEngine:
                 else:
                     st["streak"] += 1
                 st["last_state"] = "compliant"
-                # Recovery event — only fire if we previously flagged this pair as violating
                 if st["was_violating"] and st["streak"] >= PPE_VIOLATION_MIN_FRAMES:
                     self._emit_ppe_event(
                         event_type="ppe_compliant",
@@ -152,7 +130,6 @@ class EventEngine:
                     st["was_violating"] = False
                     st["last_event_ts"] = now
 
-        # Optionally decay streaks for pairs not observed this frame
         for key, st in list(self._per_pair.items()):
             if key not in seen_pairs:
                 st["streak"] = 0

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uvicorn
 
-from app.config import API_HOST, API_PORT, LOG_LEVEL
+from app.core.config import API_HOST, API_PORT, LOG_LEVEL
 
 
 if __name__ == "__main__":

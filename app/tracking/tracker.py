@@ -1,11 +1,11 @@
-"""Centroid-distance ObjectTracker with configurable thresholds."""
+"""Centroid-distance object tracker."""
 from __future__ import annotations
 
 import math
 import time
 from typing import Dict, List, Optional
 
-from app.utils.bbox import is_valid_bbox
+from app.core.bbox import bbox_iou, is_valid_bbox
 
 
 class TrackedObject:
@@ -31,11 +31,12 @@ class TrackedObject:
 
 
 class ObjectTracker:
-    def __init__(self, distance_threshold: float = 100.0, stale_timeout: float = 3.0):
+    def __init__(self, distance_threshold: float = 160.0, stale_timeout: float = 0.8):
         self.objects: Dict[int, TrackedObject] = {}
         self.next_id = 0
         self.distance_threshold = distance_threshold
         self.stale_timeout = stale_timeout
+        self.current_ids: set = set()
 
     def update(self, detections):
         current_ids = set()
@@ -46,13 +47,20 @@ class ObjectTracker:
             if not is_valid_bbox(bbox):
                 continue
             best_id: Optional[int] = None
-            best_distance = self.distance_threshold
+            best_key = None
             for oid, obj in self.objects.items():
                 if oid in current_ids:
-                    continue  # each existing track can match at most one detection
-                d = obj.distance_to(bbox)
-                if d < best_distance:
-                    best_distance = d
+                    continue
+                iou = bbox_iou(obj.bbox, bbox)
+                dist = obj.distance_to(bbox)
+                if iou >= 0.25:
+                    key = (0, -iou, dist)
+                elif dist < self.distance_threshold:
+                    key = (1, dist, 0.0)
+                else:
+                    continue
+                if best_key is None or key < best_key:
+                    best_key = key
                     best_id = oid
             if best_id is not None:
                 self.objects[best_id].update(bbox)
@@ -64,8 +72,11 @@ class ObjectTracker:
                 self.objects[new_id] = TrackedObject(new_id, bbox)
                 det["track_id"] = new_id
                 current_ids.add(new_id)
-        stale = [oid for oid, obj in self.objects.items()
-                 if oid not in current_ids and obj.is_stale(self.stale_timeout)]
+        stale = [
+            oid for oid, obj in self.objects.items()
+            if oid not in current_ids and obj.is_stale(self.stale_timeout)
+        ]
         for oid in stale:
             del self.objects[oid]
+        self.current_ids = current_ids
         return self.objects

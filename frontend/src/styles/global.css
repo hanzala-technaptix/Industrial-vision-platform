@@ -18,7 +18,6 @@ body {
   background-color: var(--bg-main);
   color: var(--text-main);
   font-family: 'Inter', sans-serif;
-  overflow: hidden;
 }
 
 /* Sidebar Layout */
@@ -29,12 +28,7 @@ body {
 }
 
 .sidebar {
-  width: var(--sidebar-width);
-  background: var(--bg-sidebar);
-  border-right: 1px solid #1e293b;
-  display: flex;
-  flex-direction: column;
-  padding: 2rem 1rem;
+  display: none;
 }
 
 .main-content {
