@@ -2,7 +2,7 @@
 
 Computer vision for factory floors. Detect people, check PPE, watch restricted zones, and measure idle time and downtime from existing CCTV or recorded video.
 
-Demos and the live API share one engine (`FrameProcessor`). Scripts in `demos/` only call `app/pipelines/`.
+The dashboard and API are the application. They share one engine (`FrameProcessor`).
 
 **Docs:** [Use cases](docs/use_cases.md) · [Architecture](docs/architecture.md) · [Data](docs/data.md)
 
@@ -10,18 +10,18 @@ Demos and the live API share one engine (`FrameProcessor`). Scripts in `demos/` 
 
 ## Status
 
-| # | Use case | Command | Video | Status |
-|---|----------|---------|-------|--------|
-| 01 | PPE compliance | `python demos/01_ppe/run.py --show` | `test-videos/01_ppe/` | Working |
-| 02 | Person detection | `python demos/02_person/run.py` | `test-videos/02_person/` | Working |
-| 03 | Restricted zone | `python demos/03_restricted_zone/run.py` | `test-videos/03_restricted_zone/` | Working |
-| 04 | Product counting | `python demos/04_product_counting/run.py` | `test-videos/04_product_counting/` | Working |
-| 05 | Quality defect | `python demos/05_quality_defect/run.py` | MVTec still images | Train then run |
-| 06 | Machine idle | `python demos/06_machine_idle/run.py` | `test-videos/06_machine_idle/` | Working |
-| 07 | Worker idle | `python demos/07_worker_idle/run.py` | Reuses 03 clip | Working |
-| 08 | Downtime analytics | `python demos/08_downtime_analytics/run.py` | Reuses 06 clip | Working |
+| # | Use case | Video | Status |
+|---|----------|-------|--------|
+| 01 | PPE compliance | `test-videos/01_ppe/` | Working |
+| 02 | Person detection | `test-videos/02_person/` | Working |
+| 03 | Restricted zone | `test-videos/03_restricted_zone/` | Working |
+| 04 | Product counting | `test-videos/04_product_counting/` | Working |
+| 05 | Quality defect | MVTec still images | Train then run |
+| 06 | Machine idle | `test-videos/06_machine_idle/` | Working |
+| 07 | Worker idle | Reuses 03 clip | Working |
+| 08 | Downtime analytics | Reuses 06 clip | Working |
 
-Press **q** or **ESC** to close a video window. Override a clip with `--source path`. PPE is different: pass the file as a positional argument (`python demos/01_ppe/run.py path.mp4 --show`). Quality (05) is still images on the dashboard (slideshow) and CLI (any key for next image).
+Quality (05) is inspection stills on the dashboard (slideshow), not CCTV.
 
 ---
 
@@ -51,7 +51,7 @@ Place these videos locally (not in Git):
 
 ---
 
-## Live showcase
+## Run
 
 The API and the dashboard are two processes. Keep both running.
 
@@ -84,7 +84,7 @@ python run.py
 | Endpoint | Purpose |
 |----------|---------|
 | `/use_cases` | Catalog + which case is live |
-| `POST /use_cases/{id}` | Switch demo (ppe, person, zone, worker_idle, product_counting, machine_idle, downtime) |
+| `POST /use_cases/{id}` | Switch case (ppe, person, zone, worker_idle, product_counting, quality, machine_idle, downtime) |
 | `/health` | Pipeline, camera, and current use case |
 | `/events` | Recent events (PPE) |
 | `/events/stats` | Event counts |
@@ -99,29 +99,34 @@ Counting, machine idle, and downtime read `test-videos/04_product_counting/` and
 ## Architecture
 
 ```text
-Camera / MP4
+Dashboard
      │
      ▼
-FrameProcessor          ← demos and live API
+API  (run.py FastAPI)
+     │
+     ▼
+Use cases  (POST /use_cases/{id})
+     │
+     ▼
+Camera / MP4  →  FrameProcessor
      │
      ├─ detection/      PPE, person
      ├─ analytics/      zone, idle, count, quality
      ├─ events/         SQLite + PPE alerts
      └─ rendering/      overlays
      │
-     ├─ demos/*/run.py  CLI → app/pipelines/
-     └─ run.py          FastAPI + POST /use_cases/{id}
+     ▼
+/video_feed  /detectors  /events
 ```
 
 | Path | Role |
 |------|------|
 | `app/` | Runtime: pipelines, detection, analytics, API |
 | `app/pipeline/` | Shared frame engine (keep this name) |
-| `app/pipelines/` | One module per use case |
-| `demos/` | Thin CLI entry points |
+| `app/pipelines/showcase.py` | Use-case catalog for the live API |
 | `models/` | Weights (`person.pt`, `ppe.pt`, `mask.pt`, `quality.pt`) |
 | `test-videos/` | Runtime MP4s |
-| `test-images/quality/` | Optional stills for demo 05 |
+| `test-images/quality/` | Optional stills for case 05 |
 | `data/` | Training and R&D datasets |
 | `tools/training/` | Mask rebuild + MVTec quality classifier |
 
@@ -129,7 +134,7 @@ FrameProcessor          ← demos and live API
 
 ## Data policy
 
-`data/` is gitignored on purpose (~6 GB). **Do not delete it.** It holds training sets and future R&D datasets. Runtime demos read `test-videos/` and `models/` only. The API uses `data/factory.db`.
+`data/` is gitignored on purpose (~6 GB). **Do not delete it.** It holds training sets and future R&D datasets. Runtime reads `test-videos/` and `models/` only. The API uses `data/factory.db`.
 
 See [docs/data.md](docs/data.md) for paths, licences, and what is still missing.
 

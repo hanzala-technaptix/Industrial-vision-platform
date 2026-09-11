@@ -1,8 +1,4 @@
-"""Live showcase catalog — one entry per CEO demo.
-
-The API switches these at runtime. CLI scripts in demos/ still call the
-matching pipelines/*.py modules.
-"""
+"""Live use-case catalog. The API switches these at runtime."""
 from __future__ import annotations
 
 from dataclasses import dataclass

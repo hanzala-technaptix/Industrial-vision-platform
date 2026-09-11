@@ -1,4 +1,4 @@
-"""Shared per-frame processing for demos and live pipeline."""
+"""Per-frame processing for the live pipeline."""
 from __future__ import annotations
 
 from typing import Callable, List, Optional

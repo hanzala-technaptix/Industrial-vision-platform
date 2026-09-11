@@ -1,12 +1,10 @@
 # Use cases
 
-Each case is one module in `app/pipelines/` and a thin script in `demos/<nn>_<name>/run.py`. The live API switches **01–08** through `POST /use_cases/{id}`. Quality (**05**) is inspection stills on the dashboard slideshow (not CCTV).
-
-Press **q** or **ESC** to close a video window. Override the default clip with `--source path`. PPE takes a positional path instead (`python demos/01_ppe/run.py path.mp4 --show`).
+Each case is selected on the live dashboard. The API switches **01–08** through `POST /use_cases/{id}`. Quality (**05**) is inspection stills on the dashboard slideshow (not CCTV).
 
 Runtime videos:
 
-| Folder | Demos |
+| Folder | Cases |
 |--------|-------|
 | `test-videos/01_ppe/` | 01 |
 | `test-videos/02_person/` | 02 |
@@ -23,16 +21,10 @@ Runtime videos:
 | | |
 |--|--|
 | **Pain** | Helmet, mask, vest, or gloves not worn or removed |
-| **What you see** | Per-person PPE boxes; a second window when an item is removed |
+| **What you see** | Per-person PPE boxes; HUD alerts and Schedule A when an item is missing |
 | **Engine** | `person.pt` + `ppe.pt` + `mask.pt` → `PPEDetector` + `PPEAlertTracker` + SQLite |
 | **Video** | `test-videos/01_ppe/ppe_construction_site.mp4` |
 | **Status** | Working |
-
-```powershell
-python demos/01_ppe/run.py --show
-```
-
-Optional flags: `--report`, `--out path.mp4`, `--max-frames N`, `--conf 0.18`, `--stride 2`. Video path is positional, not `--source`.
 
 ---
 
@@ -46,10 +38,6 @@ Optional flags: `--report`, `--out path.mp4`, `--max-frames N`, `--conf 0.18`, `
 | **Video** | `test-videos/02_person/zone_multi_person.mp4` |
 | **Status** | Working |
 
-```powershell
-python demos/02_person/run.py
-```
-
 ---
 
 ## 03 — Restricted zone
@@ -61,12 +49,6 @@ python demos/02_person/run.py
 | **Engine** | `person.pt` + `ZoneDetector` |
 | **Video** | `test-videos/03_restricted_zone/worker_single_person.mp4` |
 | **Status** | Working |
-
-```powershell
-python demos/03_restricted_zone/run.py
-```
-
-Override the polygon: `--zone "x1,y1 x2,y2 x3,y3 ..."`
 
 ---
 
@@ -80,10 +62,6 @@ Override the polygon: `--zone "x1,y1 x2,y2 x3,y3 ..."`
 | **Video** | `test-videos/04_product_counting/` |
 | **Status** | Working |
 
-```powershell
-python demos/04_product_counting/run.py
-```
-
 ---
 
 ## 05 — Quality defect
@@ -94,14 +72,13 @@ python demos/04_product_counting/run.py
 | **What you see** | GOOD / DEFECT overlay on MVTec test images |
 | **Engine** | YOLO-cls `models/quality.pt` trained on one MVTec category (default `bottle`) |
 | **Data** | `data/quality/mvtec/<category>/test/` |
-| **Status** | Train once, then run. Dashboard slideshow + CLI. |
+| **Status** | Train once, then run on the dashboard slideshow. |
 
 ```powershell
 python tools/training/quality/train_mvtec.py
-python demos/05_quality_defect/run.py
 ```
 
-Optional flags: `--category bottle`, `--max-images N`. Not CCTV. Licence: CC BY-NC-SA 4.0 (non-commercial). See [data.md](data.md).
+Not CCTV. Licence: CC BY-NC-SA 4.0 (non-commercial). See [data.md](data.md).
 
 ---
 
@@ -115,10 +92,6 @@ Optional flags: `--category bottle`, `--max-images N`. Not CCTV. Licence: CC BY-
 | **Video** | `test-videos/06_machine_idle/` |
 | **Status** | Working |
 
-```powershell
-python demos/06_machine_idle/run.py
-```
-
 ---
 
 ## 07 — Worker idle
@@ -131,10 +104,6 @@ python demos/06_machine_idle/run.py
 | **Video** | Same file as 03 (`worker_single_person.mp4`). Not duplicated. |
 | **Status** | Working |
 
-```powershell
-python demos/07_worker_idle/run.py
-```
-
 ---
 
 ## 08 — Downtime analytics
@@ -142,11 +111,7 @@ python demos/07_worker_idle/run.py
 | | |
 |--|--|
 | **Pain** | No shift-level picture of running vs idle |
-| **What you see** | CLI: console timeline (no video window) — segments, running %, idle %. Live dashboard: HUD on the same 06 clip. |
+| **What you see** | HUD on the same 06 clip: running vs idle share |
 | **Engine** | Same motion signal as 06 today; trained downtime model later. CSV research data is in `data/manufacturing/downtime/`. |
 | **Video** | Same file as 06. Not duplicated. |
 | **Status** | Working |
-
-```powershell
-python demos/08_downtime_analytics/run.py
-```

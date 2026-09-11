@@ -1,12 +1,11 @@
-"""Runtime video locations for demos and the live showcase."""
+"""Runtime video locations for the live showcase."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.config import LOG_DIR, MODEL_DIR, REPO_ROOT
+from app.core.config import REPO_ROOT
 
 VIDEO_DIR = REPO_ROOT / "test-videos"
-PERSON_MODEL = MODEL_DIR / "person.pt"
 
 # One folder per use case. 07 reuses 03; 08 reuses 06 (same file, not copied).
 STORES = {
@@ -47,15 +46,10 @@ START_OFFSET_S = {
 }
 
 __all__ = [
-    "DEFAULT_VIDEOS",
-    "LOG_DIR",
-    "PERSON_MODEL",
     "STORES",
     "VIDEO_DIR",
-    "default_video",
     "expected_path",
     "first_mp4",
-    "require_video",
     "start_offset_seconds",
     "video_sources",
 ]
@@ -74,13 +68,6 @@ def first_mp4(folder: Path) -> Path | None:
         return None
     clips = sorted(folder.glob("*.mp4"))
     return clips[0] if clips else None
-
-
-def default_video(key: str) -> Path | None:
-    sources = video_sources(key)
-    if not sources:
-        return None
-    return sources[0]
 
 
 def video_sources(key: str) -> list[Path]:
@@ -110,26 +97,3 @@ def expected_path(key: str) -> Path:
     if preferred:
         return STORES[key] / preferred
     return STORES[key] / "video.mp4"
-
-
-DEFAULT_VIDEOS = {
-    key: (default_video(key) or expected_path(key))
-    for key in ("ppe", "person", "zone", "worker_idle")
-}
-
-
-def require_video(key: str, explicit: str | None = None) -> Path:
-    if explicit and str(explicit).isdigit():
-        raise SystemExit(
-            f"{key} needs a video file, not a webcam index.\n"
-            f"  Expected folder: {expected_path(key).parent}"
-        )
-    if explicit:
-        path = Path(explicit).expanduser().resolve()
-        if not path.exists():
-            raise SystemExit(f"Video not found: {path}")
-        return path
-    found = default_video(key)
-    if found:
-        return found
-    raise SystemExit(f"No video for '{key}'. Expected folder: {expected_path(key).parent}")

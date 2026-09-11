@@ -1,6 +1,4 @@
-# Industrial Vision AI — single install for demos + API
-#
-# Do NOT install opencv-python-headless — it breaks cv2.imshow for CEO demos.
+# Industrial Vision AI — API + dashboard
 
 # Computer vision
 opencv-python==4.10.0.84

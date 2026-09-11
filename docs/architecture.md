@@ -1,17 +1,19 @@
 # Architecture
 
-Industrial Safety Vision is a factory CV POC: existing CCTV or MP4 in, detections and events out. Demos and the live API share one frame engine. Folder roles live in the [README](../README.md#architecture).
+Industrial Safety Vision is a factory CV POC: existing CCTV or MP4 in, detections and events out. The dashboard and API share one frame engine. Folder roles live in the [README](../README.md#architecture).
 
 ## Runtime path
 
 ```text
-Camera / MP4
+Dashboard
+    → API (run.py FastAPI)
+    → POST /use_cases/{id}
     → camera.VideoStream
     → FrameProcessor
          → detection / analytics
          → events (PPE)
          → rendering
-    → demos/*/run.py    or    run.py FastAPI (/video_feed, /use_cases)
+    → /video_feed, /detectors, /events
 ```
 
 Weights on disk live in `models/`, not under `app/`. `app/models/` only loads them.
