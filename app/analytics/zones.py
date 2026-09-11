@@ -64,7 +64,7 @@ class ZoneDetector(BaseDetector):
         present = False
         for det in raw:
             bbox = det.get("bbox")
-            if not is_valid_bbox(bbox) or det.get("label") != "person":
+            if not is_valid_bbox(bbox) or str(det.get("label") or "").lower() != "person":
                 continue
             x1, y1, x2, y2 = bbox
             foot = ((x1 + x2) / 2, y2)

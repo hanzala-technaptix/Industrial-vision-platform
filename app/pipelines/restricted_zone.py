@@ -51,7 +51,7 @@ def run(argv: list[str] | None = None) -> int:
             if r.get("label") == "Zone":
                 present = bool((r.get("metadata") or {}).get("present"))
             bbox = r.get("bbox")
-            if is_valid_bbox(bbox) and r.get("label") == "person":
+            if is_valid_bbox(bbox) and str(r.get("label") or "").lower() == "person":
                 x1, y1, x2, y2 = map(int, bbox)
                 cv2.circle(out, (int((x1 + x2) / 2), y2), 6, (0, 255, 255), -1)
         return draw_zone_overlay(out, polygon, present)

@@ -61,20 +61,22 @@ class LiveSession:
             self._swap(spec, resolved)
         return self.snapshot()
 
-    def _resolve_source(self, spec: UseCaseSpec, source: Optional[str]) -> str:
+    def _resolve_source(self, spec: UseCaseSpec, source: Optional[str]):
         if source:
             path = Path(source).expanduser()
             if path.exists():
                 return str(path.resolve())
             return source
         found = video_for(spec)
-        if found is not None:
-            return str(found)
-        raise FileNotFoundError(
-            f"No video for '{spec.id}'. Expected {describe(spec)['expected_video']}"
-        )
+        if found is None:
+            raise FileNotFoundError(
+                f"No video for '{spec.id}'. Expected {describe(spec)['expected_video']}"
+            )
+        if isinstance(found, list):
+            return [str(p) for p in found]
+        return str(found)
 
-    def _swap(self, spec: UseCaseSpec, source: str) -> None:
+    def _swap(self, spec: UseCaseSpec, source) -> None:
         if self.pipeline is not None:
             try:
                 self.pipeline.stop()
@@ -100,11 +102,14 @@ class LiveSession:
             camera_id=CAMERA_ID,
             alert_manager=alerts,
             post_draw=post_draw_for(spec),
+            draw_alerts=False,
         )
         pipeline.start()
         self.pipeline = pipeline
         self.spec = spec
-        self.source = source
+        self.source = (
+            " | ".join(source) if isinstance(source, list) else source
+        )
 
     def stop(self) -> None:
         with self._lock:
@@ -140,8 +145,4 @@ def initial_source(use_case_id: str) -> Optional[str]:
         path = Path(VIDEO_SOURCE)
         if path.exists():
             return str(path.resolve())
-    try:
-        found = video_for(get_spec(use_case_id))
-    except KeyError:
-        found = None
-    return str(found) if found else None
+    return None

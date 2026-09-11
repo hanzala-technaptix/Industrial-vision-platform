@@ -39,6 +39,7 @@ class FramePipeline:
         camera_id: str,
         alert_manager: Optional[AlertManager] = None,
         post_draw: Optional[Callable] = None,
+        draw_alerts: bool = True,
     ):
         self.camera_manager = camera_manager
         self.camera_id = camera_id
@@ -48,6 +49,7 @@ class FramePipeline:
             alert_manager=alert_manager,
             camera_id=camera_id,
             post_draw=post_draw,
+            draw_alerts=draw_alerts,
         )
         self._running = False
         self._thread: Optional[threading.Thread] = None

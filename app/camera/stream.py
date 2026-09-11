@@ -13,6 +13,8 @@ VIDEO_EXTS = {".mp4", ".avi", ".mkv", ".mov"}
 
 
 def _is_file_source(source: Any) -> bool:
+    if isinstance(source, (list, tuple)):
+        return True
     if isinstance(source, int):
         return False
     text = str(source)
@@ -25,21 +27,47 @@ def _is_file_source(source: Any) -> bool:
     return path.exists() or path.suffix.lower() in VIDEO_EXTS
 
 
+def _interleave_by_folder(files: list[Path]) -> list[Path]:
+    """Round-robin across folders (crack, cut, good, hole, …) so classes mix."""
+    buckets: dict[str, list[Path]] = {}
+    order: list[str] = []
+    for path in sorted(files, key=lambda p: str(p).lower()):
+        key = path.parent.name.lower()
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(path)
+    mixed: list[Path] = []
+    while any(buckets[k] for k in order):
+        for key in order:
+            if buckets[key]:
+                mixed.append(buckets[key].pop(0))
+    return mixed
+
+
 def list_image_files(source: Any) -> list[Path]:
     path = Path(str(source))
     if path.is_file() and path.suffix.lower() in IMAGE_EXTS:
         return [path]
     if not path.is_dir():
         return []
-    return sorted(
+    files = [
         p for p in path.rglob("*")
         if p.is_file() and p.suffix.lower() in IMAGE_EXTS
-    )
+    ]
+    return _interleave_by_folder(files)
 
 
 class VideoStream:
     def __init__(self, source: Any = 0, camera_id: str = "cam", start_sec: float = 0.0):
-        self.source = source
+        if isinstance(source, (list, tuple)):
+            self._playlist = [str(p) for p in source if str(p)]
+            self._playlist_i = 0
+            self.source = self._playlist[0] if self._playlist else source
+        else:
+            self._playlist = None
+            self._playlist_i = 0
+            self.source = source
         self.camera_id = camera_id
         self.cap: Optional[cv2.VideoCapture] = None
         self.frame = None
@@ -51,7 +79,7 @@ class VideoStream:
         self._max_delay = 30.0
         self._frame_count = 0
         self._last_frame_time = 0.0
-        self._images = list_image_files(source)
+        self._images = [] if self._playlist else list_image_files(self.source)
         self._hold_s = 2.5
         self._start_sec = max(0.0, float(start_sec or 0.0))
 
@@ -111,7 +139,15 @@ class VideoStream:
                 if wait > 0:
                     time.sleep(wait)
             elif _is_file_source(self.source) and self.cap is not None:
-                self._seek_start()
+                if self._playlist and len(self._playlist) > 1:
+                    if self.cap is not None:
+                        self.cap.release()
+                        self.cap = None
+                    self._playlist_i = (self._playlist_i + 1) % len(self._playlist)
+                    self.source = self._playlist[self._playlist_i]
+                    print(f"[stream:{self.camera_id}] next clip {self.source}")
+                else:
+                    self._seek_start()
             else:
                 print(f"[stream:{self.camera_id}] read failed — reconnecting")
                 self.connected = False
@@ -156,7 +192,7 @@ class VideoStream:
             last = self._last_frame_time
         return {
             "camera_id": self.camera_id,
-            "source": str(self.source),
+            "source": " | ".join(self._playlist) if self._playlist else str(self.source),
             "connected": self.connected,
             "running": self.running,
             "frame_count": fc,

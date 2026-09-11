@@ -43,12 +43,14 @@ class FrameProcessor:
         alert_manager: Optional[AlertManager] = None,
         camera_id: str = "cam",
         post_draw: Optional[Callable] = None,
+        draw_alerts: bool = True,
     ):
         self.detectors = detectors
         self.event_engine = event_engine
         self.alert_manager = alert_manager
         self.camera_id = camera_id
         self.post_draw = post_draw
+        self.draw_alerts = draw_alerts
 
     def setup(self) -> None:
         for d in self.detectors:
@@ -75,7 +77,8 @@ class FrameProcessor:
             alerts = self.alert_manager.update(all_results)
 
         annotated = render_frame(frame, all_results, post_draw=self.post_draw)
-        annotated = _draw_alert_banner(annotated, alerts)
+        if self.draw_alerts:
+            annotated = _draw_alert_banner(annotated, alerts)
         return FrameResult(
             detections=all_results,
             annotated=annotated,
