@@ -32,6 +32,7 @@ from app.core.config import (
 )
 from app.core.bbox import containment, is_valid_bbox, nms_detections
 from app.detection.base import BaseDetector, DetectionResult
+from app.detection.gloves_color import infer_gloves
 from app.tracking.tracker import ObjectTracker
 
 
@@ -56,8 +57,10 @@ _LABEL_CANON = {
     "no_safety_vest": "NO-Safety Vest",
     "no-safety-vest": "NO-Safety Vest",
     "gloves": "Gloves",
+    "glove": "Gloves",
     "no-gloves": "NO-Gloves",
     "no_gloves": "NO-Gloves",
+    "no-glove": "NO-Gloves",
 }
 
 
@@ -285,9 +288,13 @@ class PPEDetector(BaseDetector):
             best_p = None
             best_score = 0.0
             best_containment = 0.0
-            min_overlap = (
-                MASK_ASSOC_MIN_OVERLAP if item.get("ppe_type") == "mask" else PPE_ASSOC_MIN_OVERLAP
-            )
+            ppe_type = item.get("ppe_type")
+            if ppe_type == "mask":
+                min_overlap = MASK_ASSOC_MIN_OVERLAP
+            elif ppe_type == "gloves":
+                min_overlap = min(PPE_ASSOC_MIN_OVERLAP, 0.12)
+            else:
+                min_overlap = PPE_ASSOC_MIN_OVERLAP
             for p in persons:
                 c = containment(item["bbox"], p["bbox"])
                 if c < min_overlap:
@@ -328,6 +335,25 @@ class PPEDetector(BaseDetector):
                     slot["best_conf"] = conf
                     slot["source_bbox"] = item["bbox"]
 
+    def _fill_gloves(self, frame, persons: List[Dict[str, Any]], ppe_items: List[Dict[str, Any]]) -> None:
+        """ppe.pt rarely fires on small nitrile gloves — fill unknown slots from color."""
+        if "gloves" not in self.required_items:
+            return
+        for p in persons:
+            slot = (p.get("ppe_status") or {}).get("gloves")
+            if not slot or slot["state"] != STATE_UNKNOWN:
+                continue
+            hit = infer_gloves(frame, p.get("bbox"))
+            if not hit:
+                continue
+            hit["assoc_person_track_id"] = p.get("track_id")
+            hit["assoc_containment"] = 1.0
+            p.setdefault("_associated_ppe", []).append(hit)
+            ppe_items.append(hit)
+            slot["state"] = STATE_COMPLIANT if hit["polarity"] == "positive" else STATE_VIOLATING
+            slot["best_conf"] = float(hit["confidence"])
+            slot["source_bbox"] = hit["bbox"]
+
     # ------------------------------------------------------------------
     # Entry point
     # ------------------------------------------------------------------
@@ -346,6 +372,7 @@ class PPEDetector(BaseDetector):
 
         # Associate PPE items to tracked persons
         self._associate(persons, ppe_items)
+        self._fill_gloves(frame, persons, ppe_items)
 
         # Update per-track history + attach violation summary to each person
         for p in persons:
@@ -358,6 +385,11 @@ class PPEDetector(BaseDetector):
             unknown: List[str] = []
             for ppe_type, slot in p["ppe_status"].items():
                 state = slot["state"]
+                if ppe_type == "gloves" and state == STATE_UNKNOWN:
+                    prev = hist.get("gloves")
+                    if prev in (STATE_COMPLIANT, STATE_VIOLATING):
+                        state = prev
+                        slot["state"] = prev
                 hist[ppe_type] = state
                 if state == STATE_VIOLATING:
                     violations.append(ppe_type)

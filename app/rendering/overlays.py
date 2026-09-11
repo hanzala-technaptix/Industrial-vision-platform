@@ -33,25 +33,30 @@ def render_alert_panel(messages: list[str], *, width: int = 520):
     return panel
 
 
-def draw_zone_overlay(frame, polygon, present: bool):
+def draw_zone_overlay(frame, polygon, present: bool, *, hud: bool = True):
     overlay = frame.copy()
     color = (0, 255, 0) if present else (0, 0, 255)
     cv2.fillPoly(overlay, [polygon], color)
     cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
     cv2.polylines(frame, [polygon], True, color, 2)
-    text = "PRESENT" if present else "ABSENT"
-    cv2.putText(frame, f"Zone: {text}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 2)
+    if hud:
+        text = "PRESENT" if present else "ABSENT"
+        cv2.putText(frame, f"Zone: {text}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 2)
     return frame
 
 
-def draw_person_count(frame, detections):
+def draw_person_count(frame, detections, *, hud: bool = True):
+    if not hud:
+        return frame
     n = sum(1 for d in detections if str(d.get("label") or "").lower() == "person")
     cv2.rectangle(frame, (10, 10), (240, 58), (0, 0, 0), -1)
     cv2.putText(frame, f"People: {n}", (20, 45), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
     return frame
 
 
-def draw_worker_status(frame, detections):
+def draw_worker_status(frame, detections, *, hud: bool = True):
+    if not hud:
+        return frame
     meta = {}
     for row in detections:
         if (row.get("metadata") or {}).get("role") == "worker":
@@ -77,7 +82,7 @@ def draw_worker_status(frame, detections):
     return frame
 
 
-def draw_count_line(frame, detections):
+def draw_count_line(frame, detections, *, hud: bool = True):
     h, w = frame.shape[:2]
     counter = next((r for r in detections if r.get("label") == "LineCount"), None)
     if counter is None:
@@ -85,14 +90,17 @@ def draw_count_line(frame, detections):
     meta = counter.get("metadata") or {}
     lx = int(meta.get("line_x", w // 2))
     cv2.line(frame, (lx, 0), (lx, h), (255, 255, 0), 2)
-    cv2.putText(
-        frame, f"Count: {meta.get('count', 0)}", (20, 40),
-        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2,
-    )
+    if hud:
+        cv2.putText(
+            frame, f"Count: {meta.get('count', 0)}", (20, 40),
+            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2,
+        )
     return frame
 
 
-def draw_downtime_hud(frame, detections, running_s: float = 0.0, idle_s: float = 0.0):
+def draw_downtime_hud(frame, detections, running_s: float = 0.0, idle_s: float = 0.0, *, hud: bool = True):
+    if not hud:
+        return frame
     meta = {}
     for row in detections:
         if (row.get("metadata") or {}).get("role") == "machine":
@@ -116,7 +124,9 @@ def draw_downtime_hud(frame, detections, running_s: float = 0.0, idle_s: float =
     return frame
 
 
-def draw_machine_status(frame, state: str, idle_seconds: float, threshold: float, motion_val: float):
+def draw_machine_status(frame, state: str, idle_seconds: float, threshold: float, motion_val: float, *, hud: bool = True):
+    if not hud:
+        return frame
     label = "RUNNING" if state == "active" else "IDLE"
     color = (0, 255, 0) if state == "active" else (0, 0, 255)
     cv2.rectangle(frame, (10, 10), (440, 110), (0, 0, 0), -1)
@@ -137,7 +147,9 @@ def draw_machine_status(frame, state: str, idle_seconds: float, threshold: float
     return frame
 
 
-def draw_quality_status(frame, detections):
+def draw_quality_status(frame, detections, *, hud: bool = True):
+    if not hud:
+        return frame
     row = detections[0] if detections else {}
     label = str(row.get("label") or "unknown").upper()
     ok = (row.get("metadata") or {}).get("ok")

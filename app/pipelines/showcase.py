@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
-from app.core.videos import default_video, expected_path
+from app.core.videos import expected_path, video_sources
 from app.detection.base import BaseDetector
 from app.analytics.machine_idle import MachineIdleDetector
 from app.analytics.quality import QualityDetector, quality_ready, quality_source_dir
@@ -21,8 +21,6 @@ from app.analytics.worker_idle import WorkerIdleDetector
 from app.analytics.zones import ZoneDetector, default_zone
 from app.rendering.overlays import (
     draw_count_line,
-    draw_downtime_hud,
-    draw_machine_status,
     draw_person_count,
     draw_quality_status,
     draw_worker_status,
@@ -46,7 +44,7 @@ def _ppe_draw(frame, detections):
 
 
 def _person_draw(frame, detections):
-    return draw_person_count(frame, detections)
+    return draw_person_count(frame, detections, hud=False)
 
 
 def _zone_draw(frame, detections):
@@ -60,50 +58,39 @@ def _zone_draw(frame, detections):
                 polygon = np.array(meta["polygon"], dtype=np.int32)
     if polygon is None:
         polygon = default_zone(frame)
-    return draw_zone_overlay(frame, polygon, present)
+    return draw_zone_overlay(frame, polygon, present, hud=False)
 
 
 def _worker_draw(frame, detections):
-    return draw_worker_status(frame, detections)
+    return draw_worker_status(frame, detections, hud=False)
 
 
 def _count_draw(frame, detections):
-    return draw_count_line(frame, detections)
+    return draw_count_line(frame, detections, hud=False)
+
+
+def _machine_roi(frame, detections):
+    for row in detections:
+        meta = row.get("metadata") or {}
+        if meta.get("role") == "machine" and meta.get("roi_polygon"):
+            import cv2
+
+            poly = np.array(meta["roi_polygon"], dtype=np.int32)
+            cv2.polylines(frame, [poly], True, (0, 255, 255), 2)
+            break
+    return frame
 
 
 def _machine_draw(frame, detections):
-    meta = {}
-    for row in detections:
-        if (row.get("metadata") or {}).get("role") == "machine":
-            meta = row.get("metadata") or {}
-            break
-    if meta.get("roi_polygon"):
-        import cv2
-
-        poly = np.array(meta["roi_polygon"], dtype=np.int32)
-        cv2.polylines(frame, [poly], True, (0, 255, 255), 2)
-    return draw_machine_status(
-        frame,
-        meta.get("state", "idle"),
-        float(meta.get("idle_s", meta.get("idle_seconds", 0))),
-        float(meta.get("idle_threshold", 3)),
-        float(meta.get("motion", 0)),
-    )
+    return _machine_roi(frame, detections)
 
 
 def _downtime_draw(frame, detections):
-    running_s = idle_s = 0.0
-    for row in detections:
-        meta = row.get("metadata") or {}
-        if meta.get("role") == "machine":
-            running_s = float(meta.get("running_s", 0))
-            idle_s = float(meta.get("idle_s", 0))
-            break
-    return draw_downtime_hud(frame, detections, running_s, idle_s)
+    return _machine_roi(frame, detections)
 
 
 def _quality_draw(frame, detections):
-    return draw_quality_status(frame, detections)
+    return draw_quality_status(frame, detections, hud=False)
 
 
 SPECS: Dict[str, UseCaseSpec] = {
@@ -143,10 +130,12 @@ def get_spec(use_case_id: str) -> UseCaseSpec:
 def video_for(spec: UseCaseSpec):
     if spec.id == "quality":
         return quality_source_dir() if quality_ready() else None
-    found = default_video(spec.video_key)
-    if found is not None and found.exists():
-        return found
-    return None
+    sources = video_sources(spec.video_key)
+    if not sources:
+        return None
+    if len(sources) == 1:
+        return sources[0]
+    return sources
 
 
 def describe(spec: UseCaseSpec) -> Dict[str, Any]:
@@ -168,7 +157,11 @@ def describe(spec: UseCaseSpec) -> Dict[str, Any]:
         "summary": spec.summary,
         "ready": video is not None,
         "engine": spec.engine,
-        "video": str(video) if video else None,
+        "video": (
+            " | ".join(str(p) for p in video)
+            if isinstance(video, list)
+            else (str(video) if video else None)
+        ),
         "expected_video": expected,
         "alerts": spec.alerts,
     }
@@ -193,12 +186,4 @@ def build_detectors(spec: UseCaseSpec, camera_id: str) -> List[BaseDetector]:
 
 
 def post_draw_for(spec: UseCaseSpec) -> Callable:
-    draw = _DRAW[spec.id]
-    if spec.id != "downtime":
-        return draw
-
-    def _draw(frame, detections):
-        # Pull live totals from the detector row if the session attached them.
-        return draw(frame, detections)
-
-    return _draw
+    return _DRAW[spec.id]

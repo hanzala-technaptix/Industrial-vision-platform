@@ -44,4 +44,7 @@ def get_detectors(request: Request):
     pipe = get_pipeline(request)
     if pipe is None:
         return {"detectors": []}
-    return {"detectors": pipe.get_detector_states()}
+    return {
+        "detectors": pipe.get_detector_states(),
+        "alerts": pipe.get_latest_alerts(),
+    }

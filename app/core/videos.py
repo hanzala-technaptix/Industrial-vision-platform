@@ -28,14 +28,16 @@ PREFERRED_NAMES = {
     "zone": "worker_single_person.mp4",
 }
 
-# Full paths that live outside the per-use-case folder.
-# 06/08 used to play the static empty-belt clip. That file looks like a
-# running conveyor (baked-in blur) but pixels barely change, so optical
-# flow stays under threshold and the HUD stays IDLE. Use a clip with
-# boxes actually translating.
-PREFERRED_PATHS = {
-    "machine_idle": VIDEO_DIR / "Boxes_moving_on_conveyor_belt_20260910150847.mp4",
-    "downtime": VIDEO_DIR / "Boxes_moving_on_conveyor_belt_20260910150847.mp4",
+# Running then stopped, then loop. Same size/fps so 06/08 can show both states.
+PLAYLISTS = {
+    "machine_idle": [
+        VIDEO_DIR / "Boxes_moving_on_conveyor_belt_20260910150847.mp4",
+        STORES["machine_idle"] / "Stationary_factory_conveyor_belt_20260911130136.mp4",
+    ],
+    "downtime": [
+        VIDEO_DIR / "Boxes_moving_on_conveyor_belt_20260910150847.mp4",
+        STORES["machine_idle"] / "Stationary_factory_conveyor_belt_20260911130136.mp4",
+    ],
 }
 
 # Seconds to skip on loop. Person clip opens on desk close-ups; COCO person
@@ -55,6 +57,7 @@ __all__ = [
     "first_mp4",
     "require_video",
     "start_offset_seconds",
+    "video_sources",
 ]
 
 
@@ -74,24 +77,35 @@ def first_mp4(folder: Path) -> Path | None:
 
 
 def default_video(key: str) -> Path | None:
+    sources = video_sources(key)
+    if not sources:
+        return None
+    return sources[0]
+
+
+def video_sources(key: str) -> list[Path]:
+    """One or more clips for a use case. 06/08 play running then idle."""
     key = _store_key(key)
-    preferred_path = PREFERRED_PATHS.get(key)
-    if preferred_path is not None and preferred_path.exists():
-        return preferred_path
+    playlist = PLAYLISTS.get(key)
+    if playlist:
+        existing = [p for p in playlist if p.exists()]
+        if existing:
+            return existing
     store = STORES[key]
     preferred = PREFERRED_NAMES.get(key)
     if preferred:
         named = store / preferred
         if named.exists():
-            return named
-    return first_mp4(store)
+            return [named]
+    found = first_mp4(store)
+    return [found] if found else []
 
 
 def expected_path(key: str) -> Path:
     key = _store_key(key)
-    preferred_path = PREFERRED_PATHS.get(key)
-    if preferred_path is not None:
-        return preferred_path
+    playlist = PLAYLISTS.get(key)
+    if playlist:
+        return playlist[-1]
     preferred = PREFERRED_NAMES.get(key)
     if preferred:
         return STORES[key] / preferred

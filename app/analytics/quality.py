@@ -16,10 +16,27 @@ def _folder_images(folder: Path) -> list[Path]:
     return sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTS)
 
 
+def _interleave_by_folder(files: list[Path]) -> list[Path]:
+    buckets: dict[str, list[Path]] = {}
+    order: list[str] = []
+    for path in sorted(files, key=lambda p: str(p).lower()):
+        key = path.parent.name.lower()
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(path)
+    mixed: list[Path] = []
+    while any(buckets[k] for k in order):
+        for key in order:
+            if buckets[key]:
+                mixed.append(buckets[key].pop(0))
+    return mixed
+
+
 def list_quality_stills(category: str | None = None) -> list[Path]:
-    local = _folder_images(TEST_IMAGE_DIR / "good") + _folder_images(TEST_IMAGE_DIR / "defect")
+    local = _folder_images(TEST_IMAGE_DIR / "defect") + _folder_images(TEST_IMAGE_DIR / "good")
     if local:
-        return local
+        return _interleave_by_folder(local)
     wanted = category or QUALITY_CATEGORY
     names = []
     for name in (wanted, "hazelnut", "bottle"):
@@ -36,12 +53,12 @@ def list_quality_stills(category: str | None = None) -> list[Path]:
             if sub.is_dir():
                 files.extend(_folder_images(sub))
         if files:
-            return files
+            return _interleave_by_folder(files)
     return []
 
 
 def quality_source_dir() -> Path | None:
-    local = _folder_images(TEST_IMAGE_DIR / "good") + _folder_images(TEST_IMAGE_DIR / "defect")
+    local = _folder_images(TEST_IMAGE_DIR / "defect") + _folder_images(TEST_IMAGE_DIR / "good")
     if local:
         return TEST_IMAGE_DIR
     files = list_quality_stills()
